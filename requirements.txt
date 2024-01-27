@@ -13,4 +13,4 @@ nltk~=3.8.1
 matplotlib~=3.7.4
 omegaconf~=2.0.6
 bitarray~=2.8.3
-hydra_core~1.0.7
+hydra_core~=1.0.7
