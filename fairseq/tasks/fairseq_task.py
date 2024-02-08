@@ -487,3 +487,10 @@ class FairseqTask(object):
 
         criterion.__class__.reduce_metrics(logging_outputs)
 
+    def begin_epoch(self, epoch, model):
+        """Hook function called before the start of each epoch."""
+        pass
+
+    def begin_valid_epoch(self, epoch, model):
+        """Hook function called before the start of each validation epoch."""
+        pass

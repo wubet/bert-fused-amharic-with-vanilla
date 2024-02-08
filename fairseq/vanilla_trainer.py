@@ -140,6 +140,8 @@ class VanillaTrainer(object):
         self._wrapped_criterion = None
         self._wrapped_model = None
         self._ema = None
+        # Initialize _gathered_optim_state
+        self._gathered_optim_state = None
 
         # TODO(myleott): support tpu
         if self.cuda and self.data_parallel_world_size > 1:
@@ -453,11 +455,24 @@ class VanillaTrainer(object):
             state_dict = utils.move_to_cpu(self.state_dict())
             state_dict["extra_state"].update(extra_state)
 
-            checkpoint_utils.torch_persistent_save(
-                state_dict,
-                filename,
-                async_write=self.cfg.checkpoint.write_checkpoints_asynchronously,
-            )
+            # checkpoint_utils.torch_persistent_save(
+            #     state_dict,
+            #     filename,
+            #     async_write=self.cfg.checkpoint.write_checkpoints_asynchronously,
+            # )
+            # Prepare the arguments for the torch_persistent_save function
+            save_args = {
+                'obj': state_dict,
+                'f': filename
+            }
+
+            # Conditionally add the async_write argument
+            if self.cfg.checkpoint.write_checkpoints_asynchronously:
+                save_args['async_write'] = self.cfg.checkpoint.write_checkpoints_asynchronously
+
+            # Call the function with the constructed arguments
+            checkpoint_utils.torch_persistent_save(**save_args)
+
             logger.info(f"Finished saving checkpoint to {os.path.abspath(filename)}")
             return os.path.abspath(filename)
         return None

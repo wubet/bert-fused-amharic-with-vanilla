@@ -164,7 +164,7 @@ def all_gather_list(data, group=None, max_size=16384):
         result = []
         for i in range(world_size):
             out_buffer = buffer[i * max_size : (i + 1) * max_size]
-            size = (255 * utils.item(out_buffer[0])) + utils.item(out_buffer[1])
+            size = (255 * utils_bert.item(out_buffer[0])) + utils_bert.item(out_buffer[1])
             if size > 0:
                 result.append(pickle.loads(bytes(out_buffer[2 : size + 2].tolist())))
         return result
