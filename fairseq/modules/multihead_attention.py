@@ -197,17 +197,19 @@ class MultiheadAttention(nn.Module):
             attn_weights += attn_mask
 
         if key_padding_mask is not None:
+            # Convert key_padding_mask to boolean dtype if it's not already
+            key_padding_mask_bool = key_padding_mask.to(torch.bool)
             # don't attend to padding symbols
             attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
             if self.onnx_trace:
                 attn_weights = torch.where(
-                    key_padding_mask.unsqueeze(1).unsqueeze(2),
+                    key_padding_mask_bool.unsqueeze(1).unsqueeze(2),
                     torch.Tensor([float("-Inf")]),
                     attn_weights.float()
                 ).type_as(attn_weights)
             else:
                 attn_weights = attn_weights.masked_fill(
-                    key_padding_mask.unsqueeze(1).unsqueeze(2),
+                    key_padding_mask_bool.unsqueeze(1).unsqueeze(2),
                     float('-inf'),
                 )
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)

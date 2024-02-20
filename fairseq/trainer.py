@@ -61,8 +61,10 @@ class Trainer(object):
     def init_meters(self, args):
         self.meters = OrderedDict()
         self.meters['train_loss'] = AverageMeter()
+        self.meters['train_acc'] = AverageMeter()
         self.meters['train_nll_loss'] = AverageMeter()
         self.meters['valid_loss'] = AverageMeter()
+        self.meters['valid_acc'] = AverageMeter()
         self.meters['valid_nll_loss'] = AverageMeter()
         self.meters['wps'] = TimeMeter()       # words per second
         self.meters['ups'] = TimeMeter()       # updates per second
@@ -283,7 +285,6 @@ class Trainer(object):
                     correct_predictions = predicted_indices.eq(target).sum().item()
                     total_elements = target.numel()
                     accuracy = correct_predictions / total_elements
-                    logging_output['accuracy'] = accuracy
 
                     # Remove 'lprobs' and 'target' from logging_output
                     logging_output.pop('lprobs', None)  # Remove 'lprobs' if it exists
@@ -340,6 +341,8 @@ class Trainer(object):
         logging_output = self.task.aggregate_logging_outputs(
             logging_outputs, self.criterion
         )
+        logging_output['acc'] = accuracy
+
         sample_size = self.task.grad_denom(sample_sizes, self.criterion)
 
         if not all(k in logging_output for k in ['ntokens', 'nsentences']):

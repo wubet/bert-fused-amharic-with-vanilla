@@ -7,7 +7,7 @@
 
 import math
 
-from fairseq import utils_bert, utils
+from fairseq import utils_bert
 
 from . import FairseqCriterion, register_criterion
 from ..logging import metrics
@@ -46,8 +46,8 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         loss, nll_loss, lprobs, target = self.compute_loss(model, net_output, sample, reduce=reduce)
         sample_size = sample['target'].size(0) if self.args.sentence_avg else sample['ntokens']
         logging_output = {
-            'loss': utils.item(loss.data) if reduce else loss.data,
-            'nll_loss': utils.item(nll_loss.data) if reduce else nll_loss.data,
+            'loss': utils_bert.item(loss.data) if reduce else loss.data,
+            'nll_loss': utils_bert.item(nll_loss.data) if reduce else nll_loss.data,
             'ntokens': sample['ntokens'],
             'nsentences': sample['target'].size(0),
             'sample_size': sample_size,
@@ -99,13 +99,13 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
             "nll_loss", nll_loss_sum / ntokens / math.log(2), ntokens, round=3
         )
         metrics.log_derived(
-            "ppl", lambda meters: utils.get_perplexity(meters["nll_loss"].avg)
+            "ppl", lambda meters: utils_bert.get_perplexity(meters["nll_loss"].avg)
         )
 
-        total = utils.item(sum(log.get("total", 0) for log in logging_outputs))
+        total = utils_bert.item(sum(log.get("total", 0) for log in logging_outputs))
         if total > 0:
             metrics.log_scalar("total", total)
-            n_correct = utils.item(
+            n_correct = utils_bert.item(
                 sum(log.get("n_correct", 0) for log in logging_outputs)
             )
             metrics.log_scalar("n_correct", n_correct)

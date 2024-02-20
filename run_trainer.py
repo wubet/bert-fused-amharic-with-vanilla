@@ -17,20 +17,18 @@ import random
 
 import torch
 
-from fairseq import checkpoint_utils, distributed_utils, options, progress_bar, tasks, utils_bert
+from fairseq import checkpoint_utils, distributed_utils, options, tasks, utils_bert
 from fairseq.data import iterators
+from fairseq.logging import progress_bar
 from fairseq.trainer import Trainer
 from fairseq.meters import AverageMeter, StopwatchMeter
 import matplotlib.pyplot as plt
 
 
-# epoch_data = []
-
-
 def save_to_csv(data, file_path):
     with open(file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Epoch', 'Loss', 'Accuracy'])  # Writing header
+        writer.writerow(['Epoch', 'Loss', 'Accuracy', 'learning rate'])  # Writing header
         writer.writerows(data)
 
 
@@ -46,6 +44,80 @@ def load_from_csv(file_path):
     return data
 
 
+def save_model(args, model, output_dir):
+    # Save the model state
+    model_path = os.path.join(output_dir, "saved_model.pth")
+    torch.save(model.state_dict(), model_path)
+
+    # Optionally, save other necessary components, like tokenizer or args
+    # For example, args might be saved to re-create the model architecture
+    args_save_path = os.path.join(output_dir, "training_args.bin")
+    with open(args_save_path, 'wb') as f:
+        torch.save(args, f)
+    print(f"Model saved to {model_path}")
+
+
+def plot_graph(epoch_data, args):
+    # Ensure the output directory exists
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Extract data for plotting
+    epochs = [data[0] for data in epoch_data]
+    losses = [data[1] for data in epoch_data]
+    accuracies = [data[2] for data in epoch_data]
+    learning_rates = [data[3] for data in epoch_data]  # Extract learning rates
+
+    # Language mapping based on args
+    language_map = {"en": "English", "am": "Amharic"}
+
+    # Check if 's' and 't' attributes exist in args, if not, set default values
+    source_language_code = getattr(args, 's', 'en')  # Default to English if not provided
+    target_language_code = getattr(args, 't', 'am')  # Default to Amharic if not provided
+
+    source_language = language_map.get(source_language_code, source_language_code)
+    target_language = language_map.get(target_language_code, target_language_code)
+
+    # Generate plot labels based on source and target languages
+    loss_label = f"{source_language} to {target_language} Bert-fused Training Loss"
+    accuracy_label = f"{source_language} to {target_language} Bert-fused Training Accuracy"
+    lr_label = f"{source_language} to {target_language} Bert-fused Learning Rate Schedule"
+
+    # Plot loss against epochs
+    plt.figure(figsize=(6, 5))
+    plt.plot(epochs, losses, '-o', label='loss')
+    plt.title(f'{loss_label}')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "training_loss.png"))  # Save the loss plot
+    plt.close()  # Close the current plot
+
+    # Plot accuracy against epochs
+    plt.figure(figsize=(6, 5))
+    plt.plot(epochs, accuracies, '-o', label='accuracy')
+    plt.title(f'{accuracy_label}')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "training_accuracy.png"))  # Save the accuracy plot
+    plt.close()  # Close the current plot
+
+    # Plot learning rate against epochs
+    plt.figure(figsize=(6, 5))
+    plt.plot(epochs, learning_rates, '-o', label='learning rate', color='green')
+    plt.title(f'{lr_label}')
+    plt.xlabel('Epochs')
+    plt.ylabel('Learning Rate')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "learning_rate.png"))  # Save the learning rate plot
+    plt.close()  # Close the current plot
+
+
 def main(args, init_distributed=False):
     # Ensure the output directory exists
     output_dir = "output"
@@ -54,7 +126,6 @@ def main(args, init_distributed=False):
 
     # Load epoch_data from CSV if it exists
     csv_path = os.path.join(output_dir, 'epoch_data.csv')  # Assuming 'output' is the directory where you save data
-    global epoch_data
 
     utils_bert.import_user_module(args)
 
@@ -121,7 +192,7 @@ def main(args, init_distributed=False):
         checkpoint_utils.save_checkpoint(args, trainer, epoch_itr, valid_losses[0], warmup_from_nmt=True)
     while lr > args.min_lr and epoch_itr.epoch < max_epoch and trainer.get_num_updates() < max_update:
         # train for one epoch
-        train(args, trainer, task, epoch_itr)
+        epoch_data = train(args, trainer, task, epoch_itr, epoch_data)
 
         if not args.disable_validation and epoch_itr.epoch % args.validate_interval == 0:
             valid_losses = validate(args, trainer, task, epoch_itr, valid_subsets)
@@ -135,6 +206,11 @@ def main(args, init_distributed=False):
         if epoch_itr.epoch % args.save_interval == 0:
             checkpoint_utils.save_checkpoint(args, trainer, epoch_itr, valid_losses[0])
 
+            model_state_dict = model.state_dict()
+            model_save_path = os.path.join(output_dir, f'model_epoch_{epoch_itr.epoch}.pth')
+            torch.save(model_state_dict, model_save_path)
+            print(f'Model saved to {model_save_path}')
+
             # Save epoch_data to CSV
             save_to_csv(epoch_data, csv_path)
 
@@ -142,68 +218,18 @@ def main(args, init_distributed=False):
             # sharded data: get train iterator for next epoch
             epoch_itr = trainer.get_train_iterator(epoch_itr.epoch)
     train_meter.stop()
+    plot_graph(epoch_data, args)
     print('| done training in {:.1f} seconds'.format(train_meter.sum))
+    # After training completes, save the model
+    save_model(args, model, output_dir)
+    print("learning_rate: ", lr)
 
 
-def plot_graph(epoch_data, args):
-    # Ensure the output directory exists
-    output_dir = "output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # Extract data for plotting
-    epochs = [data[0] for data in epoch_data]
-    losses = [data[1] for data in epoch_data]
-    accuracies = [data[2] for data in epoch_data]
-    learning_rates = [data[3] for data in epoch_data]  # Extract learning rates
-
-    # Language mapping based on args
-    language_map = {"en": "English", "am": "Amharic"}
-    source_language = language_map.get(args.s, args.s)
-    target_language = language_map.get(args.t, args.t)
-
-    # Generate plot labels based on source and target languages
-    loss_label = f"{source_language} to {target_language} Bert-fused Training Loss"
-    accuracy_label = f"{source_language} to {target_language} Bert-fused Training Accuracy"
-    lr_label = f"{source_language} to {target_language} Bert-fused Learning Rate Schedule"
-
-    # Plot loss against epochs
-    plt.figure(figsize=(6, 5))
-    plt.plot(epochs, losses, '-o', label='loss')
-    plt.title(f'{loss_label}')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "training_loss.png"))  # Save the loss plot
-    plt.close()  # Close the current plot
-
-    # Plot accuracy against epochs
-    plt.figure(figsize=(6, 5))
-    plt.plot(epochs, accuracies, '-o', label='accuracy')
-    plt.title(f'{accuracy_label}')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "training_accuracy.png"))  # Save the accuracy plot
-    plt.close()  # Close the current plot
-
-    # Plot learning rate against epochs
-    plt.figure(figsize=(6, 5))
-    plt.plot(epochs, learning_rates, '-o', label='learning rate', color='green')
-    plt.title(f'{lr_label}')
-    plt.xlabel('Epochs')
-    plt.ylabel('Learning Rate')
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "learning_rate.png"))  # Save the learning rate plot
-    plt.close()  # Close the current plot
-
-
-def train(args, trainer, task, epoch_itr):
+def train(args, trainer, task, epoch_itr, epoch_data):
     """Train the model for one epoch."""
     # Update parameters every N batches
+    global stats
+
     update_freq = args.update_freq[epoch_itr.epoch - 1] \
         if epoch_itr.epoch <= len(args.update_freq) else args.update_freq[-1]
 
@@ -228,7 +254,7 @@ def train(args, trainer, task, epoch_itr):
         # log mid-epoch stats
         stats = get_training_stats(trainer)
         for k, v in log_output.items():
-            if k in ['loss', 'nll_loss', 'ntokens', 'nsentences', 'sample_size']:
+            if k in ['loss', 'nll_loss', 'ntokens', 'nsentences', 'sample_size', 'acc']:
                 continue  # these are already logged above
             if 'loss' in k:
                 extra_meters[k].update(v, log_output['sample_size'])
@@ -256,11 +282,11 @@ def train(args, trainer, task, epoch_itr):
 
     # At the end of the epoch, store epoch number, loss, and accuracy
     current_epoch = epoch_itr.epoch
-    current_loss = stats.get('train_loss', None)  # assuming 'train_loss' is the key for your training loss
-    current_accuracy = stats.get('accuracy', None)  # assuming 'accuracy' is the key for your training accuracy
+    current_loss = stats['loss'].avg  # assuming 'train_loss' is the key for your training loss
+    current_accuracy = stats['acc'].avg
+    current_learning_rate = stats['lr']
 
-    epoch_data.append((current_epoch, current_loss, current_accuracy))
-    plot_graph(epoch_data, args)
+    epoch_data.append((current_epoch, current_loss, current_accuracy, current_learning_rate))
 
     # log end-of-epoch stats
     stats = get_training_stats(trainer)
@@ -270,11 +296,13 @@ def train(args, trainer, task, epoch_itr):
 
     # reset training meters
     for k in [
-        'train_loss', 'train_nll_loss', 'wps', 'ups', 'wpb', 'bsz', 'gnorm', 'clip',
+        'train_loss', 'train_nll_loss', 'wps', 'ups', 'wpb', 'bsz', 'gnorm', 'clip', 'train_acc'
     ]:
         meter = trainer.get_meter(k)
         if meter is not None:
             meter.reset()
+
+    return epoch_data
 
 
 def get_training_stats(trainer):
@@ -299,6 +327,11 @@ def get_training_stats(trainer):
         stats['loss_scale'] = trainer.get_meter('loss_scale')
     stats['wall'] = round(trainer.get_meter('wall').elapsed_time)
     stats['train_wall'] = trainer.get_meter('train_wall')
+    # Include the 'acc' attribute
+    # # Print the current average value of 'train_acc'
+    # value = trainer.get_meter('train_acc')
+    # print("Run-Trainer train_acc:", value)
+    stats['acc'] = trainer.get_meter('train_acc')
     return stats
 
 
