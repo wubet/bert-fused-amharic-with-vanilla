@@ -39,8 +39,8 @@ def load_from_csv(file_path):
             reader = csv.reader(file)
             next(reader)  # Skip the header
             for row in reader:
-                epoch, loss, accuracy = int(row[0]), float(row[1]), float(row[2])
-                data.append((epoch, loss, accuracy))
+                epoch, loss, accuracy, lr = int(row[0]), float(row[1]), float(row[2]), float(row[3])
+                data.append((epoch, loss, accuracy, lr))
     return data
 
 
