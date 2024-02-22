@@ -317,6 +317,7 @@ def get_parser(desc, default_task='translation'):
     parser.add_argument('--batch_size', default=32, type=int, help='Batch size for training')
     parser.add_argument('--pipeline_model_parallel', action='store_true', help='Enable pipeline model parallelism')
     parser.add_argument('--finetune_from_model', type=str, default=None, help='Path to the model for finetuning')
+    parser.add_argument('--max_epoch', type=int, help='limit the numbed of maximum epoch')
 
     from fairseq.registry import REGISTRIES
     for registry_name, REGISTRY in REGISTRIES.items():
