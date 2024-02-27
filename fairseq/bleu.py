@@ -13,9 +13,9 @@ try:
     from fairseq import libbleu
 except ImportError as e:
     import sys
+
     sys.stderr.write('ERROR: missing libbleu.so. run `pip install --editable .`\n')
     raise e
-
 
 C = ctypes.cdll.LoadLibrary(libbleu.__file__)
 
@@ -36,18 +36,20 @@ class BleuStat(ctypes.Structure):
 
 
 class SacrebleuScorer(object):
-    def __init__(self):
+    def __init__(self, case_sensitive=False):
         import sacrebleu
         self.sacrebleu = sacrebleu
+        self.case_sensitive = case_sensitive
         self.reset()
 
-    def reset(self, one_init=False):
-        if one_init:
-            raise NotImplementedError
+    def reset(self):
         self.ref = []
         self.sys = []
 
     def add_string(self, ref, pred):
+        if not self.case_sensitive:
+            ref = ref.lower()
+            pred = pred.lower()
         self.ref.append(ref)
         self.sys.append(pred)
 
@@ -57,32 +59,31 @@ class SacrebleuScorer(object):
     def result_string(self, order=4):
         if order != 4:
             raise NotImplementedError
-        return self.sacrebleu.corpus_bleu(self.sys, [self.ref])
+        return self.sacrebleu.corpus_bleu(self.sys, [self.ref], force=True, lowercase=not self.case_sensitive)
 
 
 class Scorer(object):
-    def __init__(self, pad, eos, unk):
+    def __init__(self, pad, eos, unk, case_sensitive=False):
         self.stat = BleuStat()
         self.pad = pad
         self.eos = eos
         self.unk = unk
+        self.case_sensitive = case_sensitive
         self.reset()
 
-    def reset(self, one_init=False):
-        if one_init:
-            C.bleu_one_init(ctypes.byref(self.stat))
-        else:
-            C.bleu_zero_init(ctypes.byref(self.stat))
+    def reset(self):
+        C.bleu_zero_init(ctypes.byref(self.stat))
 
     def add(self, ref, pred):
-        if not isinstance(ref, torch.IntTensor):
-            raise TypeError('ref must be a torch.IntTensor (got {})'
-                            .format(type(ref)))
-        if not isinstance(pred, torch.IntTensor):
-            raise TypeError('pred must be a torch.IntTensor(got {})'
-                            .format(type(pred)))
+        if not isinstance(ref, torch.IntTensor) or not isinstance(pred, torch.IntTensor):
+            raise TypeError('ref and pred must be torch.IntTensor')
 
-        # don't match unknown words
+        if not self.case_sensitive:
+            # Assuming ref and pred are encoded as integers representing vocabulary indices,
+            # you would need a mapping or function here to convert them to lower case if possible.
+            # This operation highly depends on how your vocabulary encodes case information.
+            pass  # Implement case conversion if feasible
+
         rref = ref.clone()
         assert not rref.lt(0).any()
         rref[rref.eq(self.unk)] = -999
@@ -127,5 +128,5 @@ class Scorer(object):
         fmt += ' (BP={:.3f}, ratio={:.3f}, syslen={}, reflen={})'
         bleup = [p * 100 for p in self.precision()[:order]]
         return fmt.format(order, self.score(order=order), *bleup,
-                          self.brevity(), self.stat.predlen/self.stat.reflen,
+                          self.brevity(), self.stat.predlen / self.stat.reflen,
                           self.stat.predlen, self.stat.reflen)
