@@ -25,7 +25,7 @@ class BilingualDataPreprocessor:
         self.am_tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()
 
     def train_tokenizer(self, files):
-        # If BERT tokenizer is not being used, then train the English tokenizer
+        # If BERT tokenizer is not being used, then train with WordLevel tokenizer
         if not self.use_bert_tokenizer:
             trainer = trainers.WordLevelTrainer(vocab_size=30000,
                                                 special_tokens=["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"])
@@ -39,7 +39,28 @@ class BilingualDataPreprocessor:
         tokens = self.en_tokenizer.tokenize(line)
         return tokens
 
+    def build_dictionary(self, filename, tokenizer):
+        dict_obj = Dictionary()
+        with open(filename, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Use provided tokenizer for encoding
+                if tokenizer == self.tokenize_line_with_bert:
+                    tokens = tokenizer(line.strip())
+                else:
+                    tokens = tokenizer.encode(line.strip()).tokens
+                for token in tokens:
+                    dict_obj.add_symbol(token)
+        return dict_obj
+
+    def save_dictionary(self, dictionary, filename, pre_fix):
+        """Save a dictionary to a file only if conditions are met"""
+        if "train.en-am" in pre_fix or 'train.bert.en-am' in pre_fix:
+            with open(filename, 'w', encoding='utf-8') as file:
+                dictionary.save(file)
+
     def preprocess_data(self, en_file, am_file, imp, pre_fix):
+        am_dict = None
+        en_dict = None
         en_file = os.path.join(os.path.dirname(os.path.abspath(os.getcwd())), en_file)
         am_file = os.path.join(os.path.dirname(os.path.abspath(os.getcwd())), am_file)
         pre_fix = os.path.join(os.path.dirname(os.path.abspath(os.getcwd())), pre_fix)
@@ -80,15 +101,9 @@ class BilingualDataPreprocessor:
             en_dict = self.build_dictionary(en_token_file, self.en_tokenizer)
             am_dict = self.build_dictionary(am_token_file, self.am_tokenizer)
 
+        # save to dictionary if it is a train file
+        if am_dict is not None:
             self.save_dictionary(am_dict, os.path.join(os.path.dirname(pre_fix), am_dict_filename), pre_fix)
-
-            if en_dict is not None and am_dict is not None:
-                am_dataset_dest_file = os.path.join(pre_fix + ".am")
-                am_ds = indexed_dataset.make_builder(am_dataset_dest_file + ".bin", imp)
-                am_consumer = consumer_wrapper(am_ds)
-                Binarizer.binarize(am_token_file, am_dict, am_consumer, append_eos=True, reverse_order=False)
-                am_ds.finalize(am_dataset_dest_file + ".idx")
-
         self.save_dictionary(en_dict, os.path.join(os.path.dirname(pre_fix), en_dict_filename), pre_fix)
 
         if en_dict is not None:
@@ -98,24 +113,12 @@ class BilingualDataPreprocessor:
             Binarizer.binarize(en_token_file, en_dict, en_consumer, append_eos=True, reverse_order=False)
             en_ds.finalize(en_dataset_dest_file + ".idx")
 
-    def build_dictionary(self, filename, tokenizer):
-        dict_obj = Dictionary()
-        with open(filename, 'r', encoding='utf-8') as f:
-            for line in f:
-                # Use provided tokenizer for encoding
-                if tokenizer == self.tokenize_line_with_bert:
-                    tokens = tokenizer(line.strip())
-                else:
-                    tokens = tokenizer.encode(line.strip()).tokens
-                for token in tokens:
-                    dict_obj.add_symbol(token)
-        return dict_obj
-
-    def save_dictionary(self, dictionary, filename, pre_fix):
-        """Save a dictionary to a file only if conditions are met"""
-        if "train.en-am" in pre_fix or 'train.bert.en-am' in pre_fix:
-            with open(filename, 'w', encoding='utf-8') as file:
-                dictionary.save(file)
+        if am_dict is not None:
+            am_dataset_dest_file = os.path.join(pre_fix + ".am")
+            am_ds = indexed_dataset.make_builder(am_dataset_dest_file + ".bin", imp)
+            am_consumer = consumer_wrapper(am_ds)
+            Binarizer.binarize(am_token_file, am_dict, am_consumer, append_eos=True, reverse_order=False)
+            am_ds.finalize(am_dataset_dest_file + ".idx")
 
 
 if __name__ == '__main__':
@@ -141,4 +144,4 @@ if __name__ == '__main__':
     processor.train_tokenizer([en_file_absolute, am_file_absolute])
 
     prefix = os.path.join(args.data_bin_path, args.task_file)
-    processor.preprocess_data(args.en_file, args.am_file,  args.implementation, prefix)
+    processor.preprocess_data(args.en_file, args.am_file, args.implementation, prefix)
