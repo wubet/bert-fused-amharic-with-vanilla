@@ -62,7 +62,7 @@ Git clone https://github.com/wubet/unified-amharic-english-corpus.git
 ```
 Process the corpus data for training and evaluation. Typically, processing encompasses various crucial stages to adeptly navigate the intricacies of language. Such stages encompass breaking down words into subwords or tokens, mapping these tokens to a specific vocabulary, and incorporating special tokens, all aimed at enhancing the model's proficiency in dealing with infrequent words and morphological differences.
 
-Training data for NMT:
+Preprocessing Training data for NMT:
 ```commandline
 python3 data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/train.am-en.base.en"
@@ -72,7 +72,7 @@ python3 data/bilingual_data_processor.py \
 --task_file="train.en-am"
 ```
 
-Training data for Bert:
+Preprocessing Training data for Bert:
 ```commandline
 python3 data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/train.am-en.base.en"
@@ -82,7 +82,7 @@ python3 data/bilingual_data_processor.py \
 --use_bert_tokenizer
 ```
 
-Validation Data for NMT:
+Preprocessing Validation Data for NMT:
 ```commandline
 python3 data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/dev.am-en.base.en"
@@ -91,7 +91,7 @@ python3 data/bilingual_data_processor.py \
 --task_file="valid.en-am"
 ```
 
-Validation Data for Bert:
+Preprocessing Validation Data for Bert:
 ```commandline
 python3 data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/dev.am-en.base.en"
@@ -101,7 +101,7 @@ python3 data/bilingual_data_processor.py \
 --use_bert_tokenizer
 ```
 
-Test Data for NMT:
+Preprocessing Test Data for NMT:
 ```commandline
 python3 Data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/test.am-en.base.en"
@@ -110,7 +110,7 @@ python3 Data/bilingual_data_processor.py \
 --task_file="test.en-am"
 ```
 
-Test Data for Bert:
+Preprocessing Test Data for Bert:
 ```commandline
 python3 Data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/test.am-en.base.en"
@@ -118,6 +118,13 @@ python3 Data/bilingual_data_processor.py \
 --data_bin_path="data-bin/bert/wmt23_en_am"
 --task_file="test.bert.en-am"
 --use_bert_tokenizer
+```
+
+Preparing Amharic translitration file
+```commandline
+python3 translitration/create_transliteration.py
+--source_filenames=unified-amharic-english-corpus/datasets/train.am-en.base.en \
+--target_filenames=unified-amharic-english-corpus/datasets/train.am-en.transliteration.am
 ```
 
 ### Train the Model

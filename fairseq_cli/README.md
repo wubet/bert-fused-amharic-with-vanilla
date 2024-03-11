@@ -69,17 +69,31 @@ python3 data/bilingual_data_processor.py \
 
 Test Data:
 ```commandline
-python3 Data/bilingual_data_processor.py \
+python3 data/bilingual_data_processor.py \
 --en_file="unified-amharic-english-corpus/datasets/test.am-en.base.en" \
 --am_file="unified-amharic-english-corpus/datasets/test.am-en.transliteration.am" \
 --implementation="mmap" \
 --data_bin_path="data-bin/vanilla/wmt23_en_am" \
 --task_file="test.en-am"
 ```
+Preparing Amharic translitration file for training
+```commandline
+python3 ../translitration/create_transliteration.py
+--source_filenames=unified-amharic-english-corpus/datasets/train.am-en.base.en \
+--target_filenames=unified-amharic-english-corpus/datasets/train.am-en.transliteration.am
+```
+
+Preparing Amharic translitration file for testing
+```commandline
+python3 ../translitration/create_transliteration.py
+--source_filenames=unified-amharic-english-corpus/datasets/test.am-en.base.en \
+--target_filenames=unified-amharic-english-corpus/datasets/test.am-en.transliteration.am
+```
 
 ### Train The Model
 In order to train the model use the following command:
 ```commandline
+python3 fairseq_cli/train
 --arch=vanilla_transformer_wmt_en_am \
 --source-lang=en \
 --target-lang=am \
