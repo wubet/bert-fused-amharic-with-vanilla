@@ -56,10 +56,36 @@ python3 setup.py build_ext –inplace
 
 ### Data Preparation
 
+This step includes cleaning the data (removing unnecessary characters, normalizing text, etc.), tokenizing sentences (breaking text down into smaller parts like words or subwords), and applying more advanced text processing techniques to improve model training efficiency. 
+
 Clone the English-Amharic corpus.
 ```commandline
 Git clone https://github.com/wubet/unified-amharic-english-corpus.git
 ```
+
+We need to transliterate the Gee'z character representation into latin character representation.
+
+For development or validation
+```buildoutcfg
+python3 translitration/create_transliteration.py \
+  --original_filenames=unified-amharic-english-corpus/datasets/dev.am-en.base.am \
+  --transliterate_filenames=unified-amharic-english-corpus/datasets/dev.am-en.transliteration.am \
+```
+
+For training
+```buildoutcfg
+python3 translitration/create_transliteration.py \
+  --original_filenames=unified-amharic-english-corpus/datasets/train.am-en.base.am \
+  --transliterate_filenames=unified-amharic-english-corpus/datasets/train.am-en.transliteration.am \
+```
+
+For testing
+```buildoutcfg
+python3 translitration/create_transliteration.py \
+  --original_filenames=tf-transformer/unified-amharic-english-corpus/datasets/test.am-en.base.am \
+  --transliterate_filenames=unified-amharic-english-corpus/datasets/test.am-en.transliteration.am \
+```
+
 Process the corpus data for training and evaluation. Typically, processing encompasses various crucial stages to adeptly navigate the intricacies of language. Such stages encompass breaking down words into subwords or tokens, mapping these tokens to a specific vocabulary, and incorporating special tokens, all aimed at enhancing the model's proficiency in dealing with infrequent words and morphological differences.
 
 Preprocessing Training data for NMT:
